@@ -1,8 +1,11 @@
 import admin, { ServiceAccount } from "firebase-admin";
-import serviceAccount from "../../serviceAccount.json";
-
+import * as dotenv from "dotenv";
+dotenv.config();
+const serviceAccount = JSON.parse(
+  process.env.FIREBASE_SERVICE_ACCOUNT as string
+) as ServiceAccount;
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount as ServiceAccount),
+  credential: admin.credential.cert(serviceAccount),
   storageBucket: "devlab-b8a1e.firebasestorage.app",
 });
 
