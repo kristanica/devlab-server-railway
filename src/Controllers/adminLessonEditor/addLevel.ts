@@ -45,6 +45,8 @@ export const addLevel = async (req: Request, res: Response) => {
     batch.set(newStageRef, {
       createdAt: new Date(),
       order: 1,
+      type: "Lesson",
+      isHidden: false,
       title: "A new stage is automatically created",
       description:
         "This is your first stage. Customize the title and content to guide learners through the initial steps of this level.",

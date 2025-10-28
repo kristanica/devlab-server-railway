@@ -13,19 +13,24 @@ export const addLesson = async (req: Request, res: Response) => {
     const nextNumber =
       (newLessonNumber!.length > 0 ? Math.max(...newLessonNumber!) : 0) + 1;
 
+    const batch = db.batch();
     const newLessonId = `Lesson${nextNumber}`;
 
-    await db.collection(category).doc(newLessonId).set({
+    // await db.collection(category).doc(newLessonId).set({
+    //   Lesson: nextNumber,
+    //   createdAt: new Date(),
+    // });
+    batch.set(db.collection(category).doc(newLessonId), {
       Lesson: nextNumber,
       createdAt: new Date(),
     });
-
-    await db
-      .collection(category)
-      .doc(newLessonId)
-      .collection("Levels")
-      .doc("Level1")
-      .set({
+    batch.set(
+      db
+        .collection(category)
+        .doc(newLessonId)
+        .collection("Levels")
+        .doc("Level1"),
+      {
         lesson: 1,
         description: "This is a newly added level, feel free to edit this!",
         title: "This is a template!",
@@ -33,8 +38,29 @@ export const addLesson = async (req: Request, res: Response) => {
         coinsReward: 1,
         levelOrder: 1,
         createdAt: new Date(),
-      });
+      }
+    );
 
+    batch.set(
+      db
+        .collection(category)
+        .doc(newLessonId)
+        .collection("Levels")
+        .doc("Level1")
+        .collection("Stages")
+        .doc("Stage1"),
+      {
+        createdAt: new Date(),
+        order: 1,
+        type: "Lesson",
+        isHidden: false,
+        title: "A new stage is automatically created",
+        description:
+          "Customize the title and content to guide learners through the initial steps of this level.",
+      }
+    );
+
+    await batch.commit();
     return res
       .status(200)
       .json({ message: `Lesson ${nextNumber} has been added sucessfully!` });

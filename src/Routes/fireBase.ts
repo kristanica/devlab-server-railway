@@ -837,6 +837,53 @@ fireBaseRoute.get(
   }
 );
 
+fireBaseRoute.get(
+  "/progress/all",
+  middleWare,
+  async (req: IUserRequest, res: Response) => {
+    try {
+      const uid = req.user?.uid;
+      const userRef = db.collection("Users").doc(uid);
+      const subjectTemp = ["Html", "Css", "JavaScript", "Database"];
+
+      const levelCount: Record<string, number> = {};
+
+      for (const subjectLoop of subjectTemp) {
+        const lessonRef = await userRef
+
+          .collection("Progress")
+          .doc(subjectLoop)
+          .collection("Lessons")
+          .get();
+
+        let userSubjectLevelCount = 0;
+        for (const lessonTemp of lessonRef.docs) {
+          const lessonId = lessonTemp.id;
+
+          const levelRef = await userRef
+
+            .collection("Progress")
+            .doc(subjectLoop)
+            .collection("Lessons")
+            .doc(lessonId)
+            .collection("Levels")
+            .where("isCompleted", "==", true)
+            .get();
+          userSubjectLevelCount += levelRef.size;
+        }
+
+        levelCount[subjectLoop] = userSubjectLevelCount;
+      }
+
+      return res.status(200).json(levelCount);
+    } catch (error) {
+      return res.status(500).json({
+        message: "Something went wrong when fetching user progress",
+      });
+    }
+  }
+);
+
 // para sa useGameMode Data q sa web
 fireBaseRoute.get(
   "/getGameMode/:subject/:lessonId/:levelId/:stageId",
