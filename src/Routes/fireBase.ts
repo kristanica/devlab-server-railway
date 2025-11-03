@@ -433,16 +433,16 @@ fireBaseRoute.post(
         .get();
 
       const isLastStageOfLevel = nextStageQuery.empty; // <-- check if last stage!nextLevelQuery.empty of current level
-
       // ----------------------------
       // Handle next stage unlock
       // ----------------------------
+      // NOTE: If there is still next stage on current level, will fallback to this
       if (!nextStageQuery.empty) {
         const nextStageDoc = nextStageQuery.docs[0];
         const nextStageId = nextStageDoc.id;
         const nextStageType = nextStageDoc.data()?.type || null;
 
-        // mark current stage as completed
+        // NOTE:mark current stage as completed
         const currentStageRef = stageRefPlaceHolder.doc(stageId);
         await currentStageRef.set(
           {
@@ -452,7 +452,7 @@ fireBaseRoute.post(
           { merge: true }
         );
 
-        // unlock next stage (special case for Stage1)
+        // NOTE: Unlock next stage (special case for Stage1)
         const nextStageRef = stageRefPlaceHolder.doc(nextStageId);
         const nextStageSnap = await nextStageRef.get();
 
@@ -466,6 +466,7 @@ fireBaseRoute.post(
             { merge: true }
           );
         } else {
+          // NOTE: Marks the next stage as false of not stage1
           const nextStageData = nextStageSnap.data();
           if (nextStageData?.isCompleted !== true) {
             await nextStageRef.set(
@@ -482,6 +483,7 @@ fireBaseRoute.post(
           }
         }
 
+        //NOTE: Returns the value for unlocking next stage
         return res.status(200).json({
           message: "Next stage unlocked",
           nextStageId,
@@ -489,10 +491,12 @@ fireBaseRoute.post(
           isNextStageUnlocked: true,
         });
       }
+      //END OF UNLOCKING NEXT STAGE
 
       // ----------------------------
-      // Handle next level unlock
+      // NOTE: Handle next level unlock
       // ----------------------------
+      // NOTE: If there is no next stage on current level, will fallback to this
       const currentLevelOrder = (
         await db
           .collection(subject)
@@ -528,7 +532,7 @@ fireBaseRoute.post(
 
       const currentLevelRef = levelRefPlaceHolder.doc(levelId);
 
-      // Always mark last stage as completed
+      // NOTE: Always mark last stage as completed
       const lastStageRef = stageRefPlaceHolder.doc(stageId);
       await lastStageRef.set(
         {
@@ -538,7 +542,7 @@ fireBaseRoute.post(
         { merge: true }
       );
 
-      // Always mark current level as completed if last stage
+      // NOTE Always mark current level as completed if last stage
       if (isLastStageOfLevel) {
         await currentLevelRef.set(
           {
@@ -643,7 +647,6 @@ fireBaseRoute.post(
             isActive: true,
             isCompleted: true,
             dateUnlocked: new Date(),
-            status: true,
           },
           { merge: true }
         );

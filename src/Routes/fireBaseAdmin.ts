@@ -31,6 +31,7 @@ import { deleteSpecificProgress } from "../Controllers/userManagement/deleteSpec
 import { deleteAllProgress } from "../Controllers/userManagement/deleteAllProgress";
 import { editUser } from "../Controllers/userManagement/editUser";
 import { deleteAchievement } from "../Controllers/userManagement/deleteAchievement";
+import { addNEWLesson } from "../Controllers/adminLessonEditor/addNEWLesson";
 
 const fireBaseAdminRoute = express.Router();
 
@@ -129,6 +130,8 @@ fireBaseAdminRoute.post(
   upload.single("video"), // Must be sent as URI. Name of the video on formData MUST be video
   uploadVideo
 );
+
+fireBaseAdminRoute.post("/addNewLesson", upload.any(), addNEWLesson);
 
 //fetches all users
 fireBaseAdminRoute.get("/getUsers", middleWare, fetchUsers);

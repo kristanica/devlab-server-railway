@@ -16,10 +16,6 @@ export const addLesson = async (req: Request, res: Response) => {
     const batch = db.batch();
     const newLessonId = `Lesson${nextNumber}`;
 
-    // await db.collection(category).doc(newLessonId).set({
-    //   Lesson: nextNumber,
-    //   createdAt: new Date(),
-    // });
     batch.set(db.collection(category).doc(newLessonId), {
       Lesson: nextNumber,
       createdAt: new Date(),
