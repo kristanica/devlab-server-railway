@@ -1,6 +1,7 @@
 import { bucket, db } from "../../admin/admin";
 import { Request, Response } from "express";
 import { filter } from "../nativeExclusive/filter";
+import { FieldValue } from "firebase-admin/firestore";
 
 export const editStage = async (req: Request, res: Response) => {
   const { category, lessonId, levelId, stageId, stageType } = req.body as {
@@ -95,6 +96,9 @@ export const editStage = async (req: Request, res: Response) => {
         if (files.length > 0) {
           const deleteFiles = files.map((file) => file.delete());
           await Promise.all(deleteFiles);
+          await stageRef.update({
+            replicationFile: FieldValue.delete(),
+          });
         } else {
           console.log("File does not exist");
         }

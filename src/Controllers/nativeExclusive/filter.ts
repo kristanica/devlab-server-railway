@@ -34,6 +34,7 @@ const filters: Record<
       "timer",
       "hint",
       "copyCode",
+      "codingInterface",
       "videoPresentation",
       "imageReplication",
       "blocks",

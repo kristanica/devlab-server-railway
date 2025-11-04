@@ -52,26 +52,7 @@ export const fetchUsers = async (req: Request, res: Response) => {
 
         levelCount[subjectLoop] = userSubjectLevelCount;
       }
-      const userItems = userRef.doc(userId).collection("Inventory");
 
-      const itemSnap = await userItems.get();
-
-      // NOTE: STIll UNUSED, COMPLECATED AS FUCK
-      const inventoryItems: Record<
-        string,
-        {
-          title: string;
-          quantity: number;
-        }
-      > = {};
-
-      itemSnap.docs.map((doc) => {
-        const data = doc.data();
-        inventoryItems[doc.id] = {
-          title: data.title || "",
-          quantity: data.quantity || 0,
-        };
-      }) || [];
       const groupedAchievements: Record<
         "Html" | "Css" | "JavaScript" | "Database",
         { quantity: number }
@@ -106,7 +87,7 @@ export const fetchUsers = async (req: Request, res: Response) => {
         ...userInfo,
         isAccountSuspended: isAccountSuspended,
         levelCount,
-        inventory: inventoryItems,
+
         achievements: groupedAchievements,
       });
     }
