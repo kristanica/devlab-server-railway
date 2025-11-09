@@ -32,6 +32,8 @@ import { deleteAllProgress } from "../Controllers/userManagement/deleteAllProgre
 import { editUser } from "../Controllers/userManagement/editUser";
 import { deleteAchievement } from "../Controllers/userManagement/deleteAchievement";
 import { addNEWLesson } from "../Controllers/adminLessonEditor/addNEWLesson";
+import { addNEWLevel } from "../Controllers/adminLessonEditor/addNEWLevel";
+import { addNEWStage } from "../Controllers/adminLessonEditor/addNEWStage";
 
 const fireBaseAdminRoute = express.Router();
 
@@ -117,10 +119,7 @@ fireBaseAdminRoute.post(
   upload.single("replicateFile"), // Must be sent as URI. Name of the image on formData MUST be replicateImage
   uploadFile
 );
-fireBaseAdminRoute.get("/test", (req, res) => {
-  console.log("reached");
-  res.status(200).json({ message: "Route hit!" });
-});
+
 // Seperate call, must be sent as formData and make content-type "multipart/form-data"
 
 fireBaseAdminRoute.post("/codeCrafter", middleWare, codeCrafter);
@@ -132,6 +131,8 @@ fireBaseAdminRoute.post(
 );
 
 fireBaseAdminRoute.post("/addNewLesson", upload.any(), addNEWLesson);
+fireBaseAdminRoute.post("/addNewLevel", upload.any(), addNEWLevel);
+fireBaseAdminRoute.post("/addNewStage", upload.any(), addNEWStage);
 
 //fetches all users
 fireBaseAdminRoute.get("/getUsers", middleWare, fetchUsers);
@@ -143,5 +144,5 @@ fireBaseAdminRoute.post("/deleteUser", middleWare, deleteUser);
 fireBaseAdminRoute.post("/progress/reset", middleWare, deleteSpecificProgress);
 fireBaseAdminRoute.post("/reset", middleWare, deleteAllProgress);
 fireBaseAdminRoute.post("/editUser", middleWare, editUser);
-fireBaseAdminRoute.delete("/deleteAchievement", middleWare, deleteAchievement);
+fireBaseAdminRoute.post("/deleteAchievement", middleWare, deleteAchievement);
 export default fireBaseAdminRoute;

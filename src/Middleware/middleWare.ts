@@ -1,5 +1,5 @@
-import express, {Response, NextFunction} from "express";
-import {auth, db} from "../admin/admin";
+import express, { Response, NextFunction } from "express";
+import { auth } from "../admin/admin";
 interface IUserRequest extends express.Request {
   user?: any;
 }
@@ -10,41 +10,37 @@ export const middleWare = async (
   res: Response,
   next: NextFunction
 ) => {
-  const {authorization} = req.headers;
+  const { authorization } = req.headers;
   try {
     const token = authorization?.split("Bearer ")[1];
     if (!token) {
-      return res.status(400).json({message: "Invalid Token"});
+      return res.status(400).json({ message: "Invalid Token" });
     }
     const decodedToken = await auth.verifyIdToken(token);
     // attaches decodedToken on req
     req.user = decodedToken;
     return next();
   } catch {
-    return res.status(401).json({message: "You are not authorized"});
+    return res.status(401).json({ message: "You are not authorized" });
   }
 };
 
-// Checks wether user is admin. Will be used on  Content Management
 export const adminMiddleWare = async (
   req: IUserRequest,
   res: Response,
   next: NextFunction
 ) => {
-  const user = req.user;
-
-  // Query to Check wether user is admin
-  // Not final, might switch to custom claims in the future
-  const userSnapShot = (
-    await db.collection("Users").doc(user?.uid).get()
-  ).data();
-
   try {
-    if (userSnapShot?.isAdmin === true) {
-      return next();
+    const user = req.user;
+    const userRec = await auth.getUser(user.uid);
+
+    //checks user role if admin
+    if (userRec.customClaims?.role !== "admin") {
+      return res.status(403).json({ message: "Access denied: Admins only" });
     }
-    return res.status(403).json({message: "Admins only"});
+    return next();
   } catch (error) {
-    return res.status(500).json({message: error});
+    console.error("❌ Admin middleware error:", error);
+    return res.status(403).json({ message: "You are not an admin" });
   }
 };
