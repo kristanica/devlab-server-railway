@@ -11,9 +11,6 @@ interface IUserRequest extends express.Request {
 }
 const fireBaseRoute = express();
 
-// Gets all stages within specific category, lesson and level
-// Native Specific
-
 fireBaseRoute.get("/getLesson/:category", middleWare, fetchLesson);
 
 fireBaseRoute.get(
@@ -50,66 +47,6 @@ fireBaseRoute.get(
     }
   }
 );
-
-// Purchasing an item.
-// // Not final, might switch to transaction to prevent race conditions
-// fireBaseRoute.post(
-//   "/purchaseItem",
-//   middleWare,
-//   async (req: IUserRequest, res: Response) => {
-//     const uid = req.user?.uid; // userid
-//     const { itemId, itemCost, itemName } = req.body;
-//     // Can pass the user's currency in the body instead, but might stick to this.
-//     try {
-//       const userRef = db.collection("Users").doc(uid); // queries user data
-//       const userSnap = await userRef.get();
-//       if (!userSnap.exists) {
-//         return res.status(404).json({ message: "User does not exist" });
-//       }
-
-//       const userData = userSnap.data();
-
-//       if (userData?.coins < itemCost) {
-//         return res.status(401).json({ message: "Not enough coins" });
-//       }
-//       // Update's user coins on firebase
-//       await userRef.update({
-//         coins: admin.firestore.FieldValue.increment(-Number(itemCost)),
-//       });
-
-//       const inventoryRef = db
-//         .collection("Users")
-//         .doc(uid)
-//         .collection("Inventory")
-//         .doc(itemId);
-
-//       const inventorySnap = await inventoryRef.get();
-
-//       if (inventorySnap.exists) {
-//         await inventoryRef.update({
-//           quantity: admin.firestore.FieldValue.increment(1),
-//           Icon: itemName || "",
-//           title: itemName.replace("_Icon.png", ""),
-//         });
-//       } else {
-//         await inventoryRef.set({
-//           quantity: 1,
-//           Icon: itemName || "",
-//           title: itemName.replace("_Icon.png", ""),
-//         });
-//       }
-
-//       return res.status(200).json({
-//         message: "sucess on purchasing item",
-//         newCoins: userData?.coins - itemCost,
-//       }); // returns the new coins for displaying
-//     } catch (error) {
-//       return res
-//         .status(500)
-//         .json({ message: "Failed when purchasing an item" });
-//     }
-//   }
-// );
 
 fireBaseRoute.post(
   "/purchaseItem",
@@ -202,15 +139,20 @@ fireBaseRoute.get(
     try {
       const uid = req.user?.uid;
       const { subject } = req.params;
-      const allProgress: any = {};
-      const allStages: any = {};
-      const allStagesComplete: any = {};
+
+      const allProgress: Record<string, any> = {};
+      const allStages: Record<string, any> = {};
+      const allStagesComplete: Record<string, boolean> = {};
       let completedLevels = 0;
       let completedStages = 0;
+
       const lessonRef = await db.collection(subject).get();
-      for (const lessonTemp of lessonRef.docs) {
+
+      // Map lessons to promises
+      const lessonPromises = lessonRef.docs.map(async (lessonTemp) => {
         const lessonId = lessonTemp.id;
-        const levelsDoc = await db
+
+        const levelsSnapshot = await db
           .collection("Users")
           .doc(uid)
           .collection("Progress")
@@ -219,26 +161,23 @@ fireBaseRoute.get(
           .doc(lessonId)
           .collection("Levels")
           .get();
-        for (const levelsTemp of levelsDoc.docs) {
-          const levelId = levelsTemp.id;
-          const isActive: boolean = levelsTemp.data().isActive;
-          const isRewardClaimed: boolean = levelsTemp.data().isRewardClaimed;
-          const dateUnlocked: Date = levelsTemp.data().dateUnlocked;
-          const isCompleted: boolean = levelsTemp.data().isCompleted;
-          const completedAt: Date = levelsTemp.data().completedAt;
 
-          // gets the status for each levels per specific user
+        // Map levels to promises
+        const levelPromises = levelsSnapshot.docs.map(async (levelDoc) => {
+          const levelId = levelDoc.id;
+          const levelData = levelDoc.data();
+
           allProgress[`${lessonId}-${levelId}`] = {
-            isActive: isActive,
-            isRewardClaimed: isRewardClaimed,
-            dateUnlocked: dateUnlocked,
-            isCompleted: isCompleted,
-            completedAt: completedAt,
+            isActive: levelData.isActive,
+            isRewardClaimed: levelData.isRewardClaimed,
+            dateUnlocked: levelData.dateUnlocked,
+            isCompleted: levelData.isCompleted,
+            completedAt: levelData.completedAt,
           };
 
-          if (isCompleted === true) completedLevels += 1;
+          if (levelData.isCompleted) completedLevels += 1;
 
-          const stagesDoc = await db
+          const stagesSnapshot = await db
             .collection("Users")
             .doc(uid)
             .collection("Progress")
@@ -250,27 +189,29 @@ fireBaseRoute.get(
             .collection("Stages")
             .get();
 
-          stagesDoc.forEach((stagesTemp) => {
-            const isStageActive: boolean = stagesTemp.data().isActive;
-            const isStageCompleted: boolean = stagesTemp.data().isCompleted;
-            const dateUnlockStage: Date = stagesTemp.data().dateUnlocked;
-            const stageCompletedAt: Date = stagesTemp.data().completedAt;
-            allStages[`${lessonId}-${levelId}-${stagesTemp.id}`] = {
-              isActive: isStageActive,
-              isCompleted: isStageCompleted,
-              dateUnlocked: dateUnlockStage,
-              completedAt: stageCompletedAt,
+          stagesSnapshot.docs.forEach((stageDoc) => {
+            const stageData = stageDoc.data();
+            const stageKey = `${lessonId}-${levelId}-${stageDoc.id}`;
+
+            allStages[stageKey] = {
+              isActive: stageData.isActive,
+              isCompleted: stageData.isCompleted,
+              dateUnlocked: stageData.dateUnlocked,
+              completedAt: stageData.completedAt,
             };
-            if (isStageActive === true) completedStages += 1;
+
+            allStagesComplete[stageKey] = stageData.isCompleted;
+
+            if (stageData.isActive) completedStages += 1;
+            if (stageData.isCompleted) completedStages += 1;
           });
-          stagesDoc.forEach((stagesTemp) => {
-            const stageStatus = stagesTemp.data().isCompleted;
-            allStagesComplete[`${lessonId}-${levelId}-${stagesTemp.id}`] =
-              stageStatus;
-            if (stageStatus === true) completedStages += 1;
-          });
-        }
-      }
+        });
+
+        await Promise.all(levelPromises);
+      });
+
+      await Promise.all(lessonPromises);
+
       return res.status(200).json({
         allProgress,
         allStages,
@@ -279,13 +220,105 @@ fireBaseRoute.get(
         allStagesComplete,
       });
     } catch (error) {
-      console.log(error);
+      console.error(error);
       return res.status(500).json({
-        message: "Something went wrong when fetching user progress" + error,
+        message: "Something went wrong when fetching user progress: " + error,
       });
     }
   }
 );
+
+// fireBaseRoute.get(
+//   "/userProgres/:subject",
+//   middleWare,
+//   async (req: IUserRequest, res: Response) => {
+//     try {
+//       const uid = req.user?.uid;
+//       const { subject } = req.params;
+//       const allProgress: any = {};
+//       const allStages: any = {};
+//       const allStagesComplete: any = {};
+//       let completedLevels = 0;
+//       let completedStages = 0;
+//       const lessonRef = await db.collection(subject).get();
+//       for (const lessonTemp of lessonRef.docs) {
+//         const lessonId = lessonTemp.id;
+//         const levelsDoc = await db
+//           .collection("Users")
+//           .doc(uid)
+//           .collection("Progress")
+//           .doc(subject)
+//           .collection("Lessons")
+//           .doc(lessonId)
+//           .collection("Levels")
+//           .get();
+//         for (const levelsTemp of levelsDoc.docs) {
+//           const levelId = levelsTemp.id;
+//           const isActive: boolean = levelsTemp.data().isActive;
+//           const isRewardClaimed: boolean = levelsTemp.data().isRewardClaimed;
+//           const dateUnlocked: Date = levelsTemp.data().dateUnlocked;
+//           const isCompleted: boolean = levelsTemp.data().isCompleted;
+//           const completedAt: Date = levelsTemp.data().completedAt;
+
+//           // gets the status for each levels per specific user
+//           allProgress[`${lessonId}-${levelId}`] = {
+//             isActive: isActive,
+//             isRewardClaimed: isRewardClaimed,
+//             dateUnlocked: dateUnlocked,
+//             isCompleted: isCompleted,
+//             completedAt: completedAt,
+//           };
+
+//           if (isCompleted === true) completedLevels += 1;
+
+//           const stagesDoc = await db
+//             .collection("Users")
+//             .doc(uid)
+//             .collection("Progress")
+//             .doc(subject)
+//             .collection("Lessons")
+//             .doc(lessonId)
+//             .collection("Levels")
+//             .doc(levelId)
+//             .collection("Stages")
+//             .get();
+
+//           stagesDoc.forEach((stagesTemp) => {
+//             const isStageActive: boolean = stagesTemp.data().isActive;
+//             const isStageCompleted: boolean = stagesTemp.data().isCompleted;
+//             const dateUnlockStage: Date = stagesTemp.data().dateUnlocked;
+//             const stageCompletedAt: Date = stagesTemp.data().completedAt;
+//             allStages[`${lessonId}-${levelId}-${stagesTemp.id}`] = {
+//               isActive: isStageActive,
+//               isCompleted: isStageCompleted,
+//               dateUnlocked: dateUnlockStage,
+//               completedAt: stageCompletedAt,
+//             };
+//             if (isStageActive === true) completedStages += 1;
+//           });
+//           stagesDoc.forEach((stagesTemp) => {
+//             const stageStatus = stagesTemp.data().isCompleted;
+//             allStagesComplete[`${lessonId}-${levelId}-${stagesTemp.id}`] =
+//               stageStatus;
+//             if (stageStatus === true) completedStages += 1;
+//           });
+//         }
+//       }
+//       return res.status(200).json({
+//         allProgress,
+//         allStages,
+//         completedLevels,
+//         completedStages,
+//         allStagesComplete,
+//       });
+//     } catch (error) {
+//       console.log(error);
+//       return res.status(500).json({
+//         message: "Something went wrong when fetching user progress" + error,
+//       });
+//     }
+//   }
+// );
 
 // Get's all the data per category
 // Web Specific
@@ -858,108 +891,6 @@ fireBaseRoute.get(
     }
   }
 );
-// fireBaseRoute.get(
-//   "/userProgress",
-//   middleWare,
-//   async (req: IUserRequest, res: Response) => {
-//     try {
-//       const uid = req.user?.uid;
-//       console.log(uid);
-//       const allProgress: allProgressType = {};
-//       const allStages: allStagesType = {};
-//       const specificCompletedLevels: any = {};
-//       let completedLevels = 0;
-//       let completedStages = 0;
-
-//       // Gets all user's progress accross different lesson
-//       const subjectTemp = ["Html", "Css", "JavaScript", "Database"];
-
-//       // Stores the progress sequentially in the object Html -> Css -> JavaSript -> Database
-//       for (const subjectLoop of subjectTemp) {
-//         allProgress[subjectLoop] = {};
-//         allStages[subjectLoop] = {};
-//         specificCompletedLevels[subjectLoop] = 0;
-//         const lessonRef = await db.collection(subjectLoop).get();
-//         for (const lessonTemp of lessonRef.docs) {
-//           const lessonId = lessonTemp.id;
-
-//           const levelsDoc = await db
-//             .collection("Users")
-//             .doc(uid)
-//             .collection("Progress")
-//             .doc(subjectLoop)
-//             .collection("Lessons")
-//             .doc(lessonId)
-//             .collection("Levels")
-//             .get();
-//           for (const levelsTemp of levelsDoc.docs) {
-//             const levelId = levelsTemp.id;
-//             const isActive: boolean = levelsTemp.data().isActive;
-//             const isRewardClaimed: boolean = levelsTemp.data().isRewardClaimed;
-//             const dateUnlocked: Date = levelsTemp.data().dateUnlocked;
-//             const isCompleted: boolean = levelsTemp.data().isCompleted;
-//             const completedAt: Date = levelsTemp.data().completedAt;
-
-//             allProgress[subjectLoop][`${lessonId}-${levelId}`] = {
-//               isActive: isActive,
-//               isRewardClaimed: isRewardClaimed,
-//               dateUnlocked: dateUnlocked,
-//               isCompleted: isCompleted,
-//               completedAt: completedAt,
-//             };
-
-//             if (isCompleted === true) {
-//               specificCompletedLevels[subjectLoop] += 1;
-//               completedLevels += 1;
-//             } // Stores all the completed level progress
-
-//             const stagesDoc = await db
-//               .collection("Users")
-//               .doc(uid)
-//               .collection("Progress")
-//               .doc(subjectLoop)
-//               .collection("Lessons")
-//               .doc(lessonId)
-//               .collection("Levels")
-//               .doc(levelId)
-//               .collection("Stages")
-//               .get();
-
-//             stagesDoc.forEach((stagesTemp) => {
-//               const isStageActive: boolean = stagesTemp.data().isActive;
-//               const isStageCompleted: boolean = stagesTemp.data().isCompleted;
-//               const dateUnlockStage: Date = stagesTemp.data().dateUnlocked;
-//               const stageCompletedAt: Date = stagesTemp.data().completedAt;
-
-//               allStages[subjectLoop][
-//                 `${lessonId}-${levelId}-${stagesTemp.id}`
-//               ] = {
-//                 isActive: isStageActive,
-//                 isCompleted: isStageCompleted,
-//                 dateUnlocked: dateUnlockStage,
-//                 completedAt: stageCompletedAt,
-//               };
-//               if (isStageActive === true) completedStages += 1;
-//             });
-//           }
-//         }
-//       }
-
-//       return res.status(200).json({
-//         allProgress,
-//         allStages,
-//         completedLevels,
-//         completedStages,
-//         specificCompletedLevels,
-//       });
-//     } catch (error) {
-//       console.log(error);
-//       return res.status(500).json({
-//         message: "Something went wrong when fetching user progress" + error,
-//       });
-//     }
-//   }
-// );
 
 fireBaseRoute.get(
   "/progress/all",
